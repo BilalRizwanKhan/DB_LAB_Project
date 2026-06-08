@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Property Details</title>
+    <link rel="stylesheet" href="css.css">
+    <style>
+        .detail-container { max-width:800px; margin:40px auto; padding:0 20px; }
+        .detail-img { width:100%; height:400px; object-fit:cover; border-radius:10px; margin-bottom:25px; }
+        .detail-info { background:white; padding:30px; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,0.1); margin-bottom:30px; }
+        .detail-info h2 { font-size:30px; margin-bottom:10px; }
+        .price { font-size:24px; color:#00b4d8; font-weight:bold; margin:10px 0; }
+        .stars-large { color:#f4a261; font-size:22px; margin:10px 0; }
+        .section-box { background:white; padding:25px; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,0.1); margin-bottom:30px; }
+        .section-box h3 { margin-bottom:15px; }
+        .star-select { display:flex; flex-direction:row-reverse; justify-content:flex-end; gap:5px; margin-bottom:15px; }
+        .star-select input { display:none; }
+        .star-select label { font-size:30px; color:#ccc; cursor:pointer; }
+        .star-select input:checked ~ label,
+        .star-select label:hover,
+        .star-select label:hover ~ label { color:#f4a261; }
+        .review-card { background:#f9f9f9; padding:15px; border-radius:8px; margin-bottom:12px; }
+        .review-card .reviewer { font-weight:bold; }
+        .review-card .r-stars  { color:#f4a261; }
+        .delete-btn { background:none; border:none; color:#e63946; cursor:pointer; float:right; }
+        textarea, input[type=date], input[type=time] { width:100%; padding:10px; border:1px solid #ccc; border-radius:5px; }
+        .form-row { display:grid; grid-template-columns:1fr 1fr; gap:15px; }
+    </style>
+</head>
+<body>
+
+    <div class="navbar">
+        <h1>DreamHomes</h1>
+        <ul>
+            <li><a href="home.html">Home</a></li>
+            <li><a href="seller.html">Seller</a></li>
+            <li id="fav-link"    style="display:none;"><a href="favorites.html">❤ Favorites</a></li>
+            <li id="appt-link"   style="display:none;"><a href="appointments.html">📅 Appointments</a></li>
+            <li id="inq-link"    style="display:none;"><a href="inquiries.html">📩 Inquiries</a></li>
+            <li id="auth-link"><a href="login.html">Login</a></li>
+            <li id="signup-link"><a href="signup.html">Signup</a></li>
+            <li id="logout-link" style="display:none;"><a href="#" onclick="logout()">Logout</a></li>
+            <li id="user-greeting" style="display:none;color:#00b4d8;"></li>
+        </ul>
+    </div>
+
+    <div class="detail-container">
+
+        <img id="prop-img" class="detail-img" src="">
+        <div class="detail-info">
+            <h2 id="prop-title"></h2>
+            <p id="prop-location"></p>
+            <div class="price" id="prop-price"></div>
+            <div class="stars-large" id="prop-stars"></div>
+            <p id="prop-desc"></p>
+        </div>
+
+        <!-- Book Appointment -->
+        <div class="section-box" id="appt-section">
+            <h3>📅 Book a Visit</h3>
+            <div class="form-row">
+                <div class="form-group">
+                    <label>Date</label>
+                    <input id="appt-date" type="date">
+                </div>
+                <div class="form-group">
+                    <label>Preferred Time</label>
+                    <input id="appt-time" type="time">
+                </div>
+            </div>
+            <div class="form-group" style="margin-top:12px;">
+                <label>Note (optional)</label>
+                <textarea id="appt-note" rows="2" placeholder="Any special requests or questions for the seller..."></textarea>
+            </div>
+            <p id="appt-msg" style="margin:10px 0;"></p>
+            <button class="submit-btn" onclick="bookAppointment()">Book Visit</button>
+        </div>
+
+        <!-- Inquiry Form -->
+        <div class="section-box" id="inquiry-section">
+            <h3>📩 Send an Inquiry</h3>
+            <div class="form-group">
+                <textarea id="inq-message" rows="4" placeholder="Ask the seller a question..."></textarea>
+            </div>
+            <p id="inq-msg" style="margin-bottom:10px;"></p>
+            <button class="submit-btn" onclick="sendInquiry()">Send Inquiry</button>
+        </div>
+
+        <!-- Review Form -->
+        <div class="section-box" id="review-form-section">
+            <h3>⭐ Leave a Review</h3>
+            <div class="star-select">
+                <input type="radio" id="s5" name="rating" value="5"><label for="s5">★</label>
+                <input type="radio" id="s4" name="rating" value="4"><label for="s4">★</label>
+                <input type="radio" id="s3" name="rating" value="3"><label for="s3">★</label>
+                <input type="radio" id="s2" name="rating" value="2"><label for="s2">★</label>
+                <input type="radio" id="s1" name="rating" value="1"><label for="s1">★</label>
+            </div>
+            <div class="form-group">
+                <textarea id="comment" rows="3" placeholder="Write your review..."></textarea>
+            </div>
+            <p id="review-msg" style="margin-bottom:10px;"></p>
+            <button class="submit-btn" onclick="submitReview()">Submit Review</button>
+        </div>
+
+        <!-- Reviews List -->
+        <div class="section-box">
+            <h3>Reviews</h3>
+            <p id="no-reviews" style="display:none;color:gray;">No reviews yet. Be the first!</p>
+            <div id="reviews-list"></div>
+        </div>
+
+    </div>
+
+    <footer><p>© 2026 DreamHomes. All Rights Reserved.</p></footer>
+
+    <script>
+        const FALLBACK   = "https://images.unsplash.com/photo-1570129477492-45c003edd2be?q=80&w=800&auto=format&fit=crop";
+        const token      = localStorage.getItem("token");
+        const username   = localStorage.getItem("username");
+        const propertyId = new URLSearchParams(window.location.search).get("id");
+        if (!propertyId) window.location.href = "home.html";
+
+        // Set min date to today
+        document.getElementById("appt-date").min = new Date().toISOString().split("T")[0];
+
+        if (token && username) {
+            document.getElementById("auth-link").style.display    = "none";
+            document.getElementById("signup-link").style.display  = "none";
+            document.getElementById("logout-link").style.display  = "list-item";
+            document.getElementById("fav-link").style.display     = "list-item";
+            document.getElementById("appt-link").style.display    = "list-item";
+            document.getElementById("inq-link").style.display     = "list-item";
+            document.getElementById("user-greeting").style.display = "list-item";
+            document.getElementById("user-greeting").textContent  = `Hi, ${username}`;
+        } else {
+            document.getElementById("appt-section").innerHTML        = `<p style="color:gray;">Please <a href="login.html">login</a> to book a visit.</p>`;
+            document.getElementById("inquiry-section").innerHTML     = `<p style="color:gray;">Please <a href="login.html">login</a> to send an inquiry.</p>`;
+            document.getElementById("review-form-section").innerHTML = `<p style="color:gray;">Please <a href="login.html">login</a> to leave a review.</p>`;
+        }
+
+        function logout() { localStorage.removeItem("token"); localStorage.removeItem("username"); window.location.href = "home.html"; }
+
+        function renderStars(avg) {
+            if (!avg) return "No ratings yet";
+            return "★".repeat(Math.floor(avg)) + "☆".repeat(5 - Math.floor(avg)) + ` ${avg}/5`;
+        }
+
+        async function loadProperty() {
+            const res = await fetch(`/properties/${propertyId}`);
+            if (!res.ok) { window.location.href = "home.html"; return; }
+            const p   = await res.json();
+            const img = p.image_path ? `/${p.image_path.replace(/\\/g, "/")}` : FALLBACK;
+            document.getElementById("prop-img").src              = img;
+            document.getElementById("prop-img").onerror         = () => document.getElementById("prop-img").src = FALLBACK;
+            document.getElementById("prop-title").textContent    = p.title;
+            document.getElementById("prop-location").textContent = "📍 " + p.location;
+            document.getElementById("prop-price").textContent    = "$" + p.price.toLocaleString();
+            document.getElementById("prop-desc").textContent     = p.description;
+        }
+
+        async function loadReviews() {
+            const res  = await fetch(`/reviews/${propertyId}`);
+            const data = await res.json();
+            document.getElementById("prop-stars").textContent = renderStars(data.average_rating);
+            const list = document.getElementById("reviews-list");
+            list.innerHTML = "";
+            if (data.reviews.length === 0) { document.getElementById("no-reviews").style.display = "block"; return; }
+            document.getElementById("no-reviews").style.display = "none";
+            data.reviews.forEach(r => {
+                const canDelete = token && r.user_name === username;
+                list.innerHTML += `
+                    <div class="review-card" id="review-${r.id}">
+                        ${canDelete ? `<button class="delete-btn" onclick="deleteReview(${r.id})">✕ Delete</button>` : ""}
+                        <div class="reviewer">${r.user_name}</div>
+                        <div class="r-stars">${"★".repeat(r.rating)}${"☆".repeat(5 - r.rating)}</div>
+                        <div>${r.comment}</div>
+                    </div>`;
+            });
+        }
+
+        async function bookAppointment() {
+            const date = document.getElementById("appt-date").value;
+            const time = document.getElementById("appt-time").value;
+            const note = document.getElementById("appt-note").value;
+            const msg  = document.getElementById("appt-msg");
+            if (!date) { msg.style.color = "red"; msg.textContent = "Please select a date."; return; }
+            if (!time) { msg.style.color = "red"; msg.textContent = "Please select a time."; return; }
+
+            // Format time to readable e.g. "10:00 AM"
+            const [h, m]    = time.split(":");
+            const hour      = parseInt(h);
+            const formatted = `${hour % 12 || 12}:${m} ${hour < 12 ? "AM" : "PM"}`;
+
+            const res  = await fetch(`/appointments/${propertyId}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ visit_date: date, visit_time: formatted, note })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                msg.style.color = "green";
+                msg.textContent = "Visit booked! Check your email for confirmation.";
+                document.getElementById("appt-date").value = "";
+                document.getElementById("appt-time").value = "";
+                document.getElementById("appt-note").value = "";
+            } else { msg.style.color = "red"; msg.textContent = data.detail; }
+        }
+
+        async function sendInquiry() {
+            const message = document.getElementById("inq-message").value.trim();
+            const msg     = document.getElementById("inq-msg");
+            if (!message) { msg.style.color = "red"; msg.textContent = "Please write a message."; return; }
+            const res  = await fetch(`/inquiries/${propertyId}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ message })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                document.getElementById("inq-message").value = "";
+                msg.style.color = "green"; msg.textContent = "Inquiry sent! Check your inquiries page for replies.";
+            } else { msg.style.color = "red"; msg.textContent = data.detail; }
+        }
+
+        async function submitReview() {
+            const selected = document.querySelector('input[name="rating"]:checked');
+            const comment  = document.getElementById("comment").value.trim();
+            const msg      = document.getElementById("review-msg");
+            if (!selected) { msg.style.color = "red"; msg.textContent = "Please select a star rating."; return; }
+            if (!comment)  { msg.style.color = "red"; msg.textContent = "Please write a comment."; return; }
+            const res  = await fetch(`/reviews/${propertyId}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ rating: parseInt(selected.value), comment })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                document.getElementById("comment").value = "";
+                selected.checked = false;
+                msg.style.color = "green"; msg.textContent = "Review submitted!";
+                loadReviews();
+            } else { msg.style.color = "red"; msg.textContent = data.detail; }
+        }
+
+        async function deleteReview(reviewId) {
+            if (!confirm("Delete your review?")) return;
+            await fetch(`/reviews/${reviewId}`, { method: "DELETE", headers: { "Authorization": `Bearer ${token}` } });
+            loadReviews();
+        }
+
+        loadProperty();
+        loadReviews();
+    </script>
+</body>
+</html>

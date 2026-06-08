@@ -1,0 +1,634 @@
+================================================================================
+        DREAMHOMES - REAL ESTATE PLATFORM DOCUMENTATION
+================================================================================
+Generated: 2026-06-08
+================================================================================
+
+
+================================================================================
+1. PROJECT SCENARIO DESCRIPTION
+================================================================================
+
+DreamHomes is a full-featured real estate platform that connects property
+buyers, sellers, and administrators in a digital marketplace. The system
+enables property owners to list their real estate offerings, while potential
+buyers can browse, search, and interact with listings. The platform
+facilitates the entire property viewing workflow from initial inquiry through
+appointment scheduling.
+
+KEY ACTORS:
+-----------
+• Buyers: Browse properties, save favorites, submit reviews, send inquiries,
+  and book property viewings
+
+• Sellers: Post property listings, manage images, respond to inquiries, and
+  confirm viewing appointments
+
+• Admins: Oversee platform operations, manage users and properties, and
+  access system statistics
+
+TECHNOLOGY STACK:
+-----------------
+• Backend: FastAPI (Python web framework)
+• ORM: SQLAlchemy
+• Database: PostgreSQL
+• Authentication: JWT (JSON Web Tokens)
+• Password Security: Bcrypt hashing
+• Frontend: Vanilla JavaScript, HTML5/CSS3
+• Email: SMTP notifications
+
+
+================================================================================
+2. DATABASE DESIGN OVERVIEW
+================================================================================
+
+The database follows a RELATIONAL MODEL with 6 interconnected tables designed
+to support real estate transactions and user interactions.
+
+DESIGN PRINCIPLES:
+------------------
+• Referential Integrity: Foreign key constraints with CASCADE operations
+  ensure data consistency
+
+• Unique Constraints: Prevent duplicate favorites and reviews using
+  composite unique keys
+
+• Data Validation: CHECK constraints enforce business rules (rating ranges
+  1-5, status values)
+
+• Performance Optimization: Indexed columns on frequently queried fields
+  (email, user_id, property_id)
+
+• Audit Trail: Status tracking for inquiries (pending/replied/closed) and
+  appointments (pending/confirmed/cancelled)
+
+TECHNICAL SPECIFICATIONS:
+-------------------------
+• Primary Keys: INTEGER with auto-increment
+• Text Fields: VARCHAR for bounded strings, TEXT for long-form content
+• Foreign Keys: All implement ON DELETE CASCADE and ON UPDATE CASCADE
+• Constraints: Composite unique constraints prevent logical duplicates
+
+
+================================================================================
+3. TABLES AND RELATIONSHIPS
+================================================================================
+
+TABLE 1: USERS
+--------------
+Purpose: Central authentication and profile storage
+Primary Key: id (INTEGER)
+Unique Constraint: email
+Key Fields:
+  - name (VARCHAR) - User's full name
+  - email (VARCHAR) - Unique login identifier
+  - password (VARCHAR) - Bcrypt hashed password
+  - is_admin (BOOLEAN) - Admin privileges flag
+  - phone (VARCHAR) - Contact phone number
+  - city (VARCHAR) - User's city location
+  - bio (TEXT) - User profile biography
+  - avatar (VARCHAR) - Profile picture path
+
+TABLE 2: PROPERTIES
+-------------------
+Purpose: Property listings
+Primary Key: id (INTEGER)
+Foreign Key: owner_id → users(id) [CASCADE]
+Key Fields:
+  - title (VARCHAR) - Property title/headline
+  - location (VARCHAR) - Property address/location
+  - price (INTEGER) - Listing price
+  - description (TEXT) - Detailed property description
+  - image_path (VARCHAR) - Property image file path
+
+TABLE 3: FAVORITES
+------------------
+Purpose: Many-to-many relationship between users and properties
+Type: Junction Table
+Primary Key: id (INTEGER)
+Foreign Keys:
+  - user_id → users(id) [CASCADE]
+  - property_id → properties(id) [CASCADE]
+Composite Unique: (user_id, property_id)
+Purpose of Unique: Prevents users from favoriting same property twice
+
+TABLE 4: REVIEWS
+----------------
+Purpose: User ratings and comments on properties
+Type: Junction Table with Additional Data
+Primary Key: id (INTEGER)
+Foreign Keys:
+  - property_id → properties(id) [CASCADE]
+  - user_id → users(id) [CASCADE]
+Composite Unique: (user_id, property_id)
+Purpose of Unique: One review per user per property
+Key Fields:
+  - user_name (VARCHAR) - Cached username for display
+  - rating (INTEGER) - Star rating (1-5)
+  - comment (TEXT) - Review text
+Constraints: CHECK (rating >= 1 AND rating <= 5)
+
+TABLE 5: INQUIRIES
+------------------
+Purpose: Buyer-seller communication messages
+Type: Transactional Table
+Primary Key: id (INTEGER)
+Foreign Keys:
+  - property_id → properties(id) [CASCADE]
+  - buyer_id → users(id) [CASCADE]
+Key Fields:
+  - buyer_name (VARCHAR) - Cached buyer name
+  - buyer_email (VARCHAR) - Cached buyer email
+  - message (TEXT) - Inquiry message from buyer
+  - status (VARCHAR) - Current state: 'pending', 'replied', 'closed'
+  - reply (TEXT) - Seller's response message
+Constraints: CHECK (status IN ('pending', 'replied', 'closed'))
+
+TABLE 6: APPOINTMENTS
+---------------------
+Purpose: Property viewing appointment scheduling
+Type: Transactional Table
+Primary Key: id (INTEGER)
+Foreign Keys:
+  - property_id → properties(id) [CASCADE]
+  - user_id → users(id) [CASCADE]
+Key Fields:
+  - user_name (VARCHAR) - Cached user name
+  - user_email (VARCHAR) - Cached user email
+  - visit_date (VARCHAR) - Appointment date (format: "2026-06-15")
+  - visit_time (VARCHAR) - Appointment time (format: "10:00 AM")
+  - note (TEXT) - Optional visitor notes
+  - status (VARCHAR) - Current state: 'pending', 'confirmed', 'cancelled'
+Constraints: CHECK (status IN ('pending', 'confirmed', 'cancelled'))
+
+
+================================================================================
+4. ENTITY-RELATIONSHIP DIAGRAM
+================================================================================
+
+┌─────────────────────────────┐
+│         USERS               │
+│─────────────────────────────│
+│ PK: id (INTEGER)            │
+│ UK: email                   │
+│ ─────────────────────────── │
+│ name                        │
+│ email (UNIQUE)              │
+│ password (hashed)           │
+│ is_admin (BOOLEAN)          │
+│ phone                       │
+│ city                        │
+│ bio                         │
+│ avatar                      │
+└──────────────┬──────────────┘
+               │
+               │ 1:N (owner_id)
+               │
+               ▼
+┌─────────────────────────────┐
+│      PROPERTIES             │◄──────────────┐
+│─────────────────────────────│               │
+│ PK: id (INTEGER)            │               │
+│ FK: owner_id → users(id)    │               │
+│ ─────────────────────────── │               │
+│ title                       │               │
+│ location                    │               │
+│ price                       │               │
+│ description                 │               │
+│ image_path                  │               │
+└──────────────┬──────────────┘               │
+               │                              │
+               │                              │
+        ┌──────┼──────┬──────────┬────────────┼──────┐
+        │      │      │          │            │      │
+        │ N:M  │ N:M  │ 1:N      │ 1:N        │ 1:N  │
+        │      │      │          │            │      │
+        ▼      ▼      ▼          ▼            ▼      │
+┌──────────┐ ┌──────────┐ ┌─────────────┐ ┌─────────────┐
+│FAVORITES │ │ REVIEWS  │ │ INQUIRIES   │ │APPOINTMENTS │
+│──────────│ │──────────│ │─────────────│ │─────────────│
+│PK: id    │ │PK: id    │ │PK: id       │ │PK: id       │
+│FK: user  │ │FK: prop  │ │FK: property │ │FK: property │
+│FK: prop  │ │FK: user  │ │FK: buyer    │ │FK: user     │
+│          │ │          │ │             │ │             │
+│UK: (u,p) │ │rating    │ │message      │ │visit_date   │
+│          │ │comment   │ │status       │ │visit_time   │
+│          │ │UK: (u,p) │ │reply        │ │status       │
+└─────▲────┘ └─────▲────┘ └──────▲──────┘ └──────▲──────┘
+      │            │             │               │
+      └────────────┴─────────────┴───────────────┘
+              Foreign Keys to users(id)
+
+RELATIONSHIP LEGEND:
+────────────────────
+PK    = Primary Key
+FK    = Foreign Key
+UK    = Unique Constraint
+1:N   = One-to-Many Relationship
+N:M   = Many-to-Many Relationship
+CASCADE = ON DELETE CASCADE, ON UPDATE CASCADE
+
+RELATIONSHIP SUMMARY:
+─────────────────────
+• Users (1) ──→ Properties (N): One user owns many properties
+• Users (N) ←→ Properties (M): Many users favorite many properties (via FAVORITES)
+• Users (N) ←→ Properties (M): Many users review many properties (via REVIEWS)
+• Users (1) ──→ Inquiries (N): One user sends many inquiries
+• Users (1) ──→ Appointments (N): One user books many appointments
+• Properties (1) ──→ Inquiries (N): One property receives many inquiries
+• Properties (1) ──→ Appointments (N): One property has many appointments
+
+
+================================================================================
+5. DESCRIPTION OF 10 FEATURES
+================================================================================
+
+FEATURE 1: USER AUTHENTICATION
+-------------------------------
+Secure JWT-based signup and login system with bcrypt password hashing. New
+users register with name, email, and password. System validates email
+uniqueness and returns JWT access tokens for authenticated API access.
+Passwords are never stored in plain text.
+
+FEATURE 2: PROPERTY LISTINGS MANAGEMENT
+----------------------------------------
+Complete CRUD operations for property listings. Sellers create listings with
+title, location, price, and description. System supports search by keywords
+(title/location) and filtering by price range (min/max). Property owners can
+delete their own listings; admins can delete any listing.
+
+FEATURE 3: FAVORITES MANAGEMENT
+--------------------------------
+Buyers save properties to a personal favorites list for quick access later.
+Composite unique constraint prevents duplicate favorites. Users can add/remove
+favorites and retrieve full property details for all favorited listings in a
+single query.
+
+FEATURE 4: PROPERTY REVIEWS
+----------------------------
+Users rate properties on a 1-5 star scale with optional text comments. Each
+user can review a property only once (enforced by composite unique constraint).
+System calculates average rating and total review count per property. Users
+can delete their own reviews; admins can delete any review.
+
+FEATURE 5: INQUIRY SYSTEM
+--------------------------
+Buyers send text messages to property owners with automated email notifications.
+Sellers receive notifications and can reply through the platform. Inquiries
+track status (pending/replied/closed). Buyers view sent inquiries with seller
+replies; sellers view received inquiries on their properties.
+
+FEATURE 6: APPOINTMENT SCHEDULING
+----------------------------------
+Buyers book property viewing appointments with specific date and time. System
+prevents duplicate bookings (same user, property, date, time). Appointments
+track status (pending/confirmed/cancelled). Sellers confirm or cancel
+appointments; buyers can also cancel their own bookings. Automated email
+confirmations sent to buyers.
+
+FEATURE 7: USER PROFILE MANAGEMENT
+-----------------------------------
+Users maintain profile information including name, phone, city, and bio. Secure
+password change requires current password verification. Users view and manage
+their own property listings. Profile updates validate data integrity and
+maintain referential consistency.
+
+FEATURE 8: FILE UPLOAD SYSTEM
+------------------------------
+Supports property image and user avatar uploads. Validates file types (JPEG,
+PNG, WebP only) and prevents unauthorized uploads. System generates unique
+filenames using UUID, manages storage in organized directories, and
+automatically deletes old files when new ones are uploaded.
+
+FEATURE 9: ADMIN PANEL
+-----------------------
+Administrators access privileged operations: view all users and properties,
+delete users (except self), promote users to admin status, delete any property,
+and access platform statistics (total users, properties, admins). All admin
+actions verify is_admin flag before execution.
+
+FEATURE 10: EMAIL NOTIFICATIONS
+--------------------------------
+Automated SMTP email system sends notifications for key events: welcome emails
+on signup, inquiry received/replied notifications for buyer-seller
+communication, and appointment booking confirmations. Configurable email
+settings support both development (Mailtrap) and production (Gmail) SMTP
+servers.
+
+
+================================================================================
+6. SQL QUERIES USED FOR EACH FEATURE
+================================================================================
+
+--------------------------------------------------------------------------------
+FEATURE 1: USER AUTHENTICATION
+--------------------------------------------------------------------------------
+
+[SIGNUP - Check Email Availability]
+SELECT * FROM users WHERE email = 'user@example.com';
+
+[SIGNUP - Create New User]
+INSERT INTO users (name, email, password, is_admin)
+VALUES ('John Doe', 'user@example.com', '$2b$12$hashed_password_here', FALSE);
+
+[LOGIN - Verify Credentials]
+SELECT id, email, password, is_admin, name
+FROM users
+WHERE email = 'user@example.com';
+
+
+--------------------------------------------------------------------------------
+FEATURE 2: PROPERTY LISTINGS MANAGEMENT
+--------------------------------------------------------------------------------
+
+[CREATE - Post New Property]
+INSERT INTO properties (title, location, price, description, owner_id)
+VALUES ('Modern Villa', 'Los Angeles, CA', 500000, 'Beautiful 3BR villa', 1);
+
+[READ - Search Properties with Filters]
+SELECT *
+FROM properties
+WHERE (title ILIKE '%villa%' OR location ILIKE '%villa%')
+  AND price >= 100000
+  AND price <= 600000;
+
+[READ - Get All Properties (No Filters)]
+SELECT * FROM properties;
+
+[READ - Get Single Property Details]
+SELECT * FROM properties WHERE id = 5;
+
+[DELETE - Remove Property]
+DELETE FROM properties
+WHERE id = 5 AND (owner_id = 1 OR EXISTS(
+    SELECT 1 FROM users WHERE id = 1 AND is_admin = TRUE
+));
+
+
+--------------------------------------------------------------------------------
+FEATURE 3: FAVORITES MANAGEMENT
+--------------------------------------------------------------------------------
+
+[ADD - Check Property Exists]
+SELECT * FROM properties WHERE id = 5;
+
+[ADD - Check If Already Favorited]
+SELECT * FROM favorites WHERE user_id = 1 AND property_id = 5;
+
+[ADD - Insert Favorite]
+INSERT INTO favorites (user_id, property_id) VALUES (1, 5);
+
+[REMOVE - Delete Favorite]
+DELETE FROM favorites WHERE user_id = 1 AND property_id = 5;
+
+[GET - Retrieve User's Favorite Property IDs]
+SELECT property_id FROM favorites WHERE user_id = 1;
+
+[GET - Retrieve Full Property Details for Favorites]
+SELECT *
+FROM properties
+WHERE id IN (5, 8, 12);  -- IDs from previous query
+
+
+--------------------------------------------------------------------------------
+FEATURE 4: PROPERTY REVIEWS
+--------------------------------------------------------------------------------
+
+[ADD - Check Property Exists]
+SELECT * FROM properties WHERE id = 5;
+
+[ADD - Check If User Already Reviewed]
+SELECT * FROM reviews WHERE user_id = 1 AND property_id = 5;
+
+[ADD - Insert Review]
+INSERT INTO reviews (property_id, user_id, user_name, rating, comment)
+VALUES (5, 1, 'John Doe', 5, 'Excellent property with great amenities!');
+
+[GET - Retrieve All Reviews for Property]
+SELECT * FROM reviews WHERE property_id = 5;
+
+[GET - Calculate Average Rating]
+SELECT AVG(rating) as average_rating, COUNT(*) as total_reviews
+FROM reviews
+WHERE property_id = 5;
+
+[DELETE - Remove Review]
+DELETE FROM reviews
+WHERE id = 10 AND (user_id = 1 OR EXISTS(
+    SELECT 1 FROM users WHERE id = 1 AND is_admin = TRUE
+));
+
+
+--------------------------------------------------------------------------------
+FEATURE 5: INQUIRY SYSTEM
+--------------------------------------------------------------------------------
+
+[SEND - Check Property and Get Owner]
+SELECT id, owner_id FROM properties WHERE id = 5;
+
+[SEND - Insert Inquiry]
+INSERT INTO inquiries (property_id, buyer_id, buyer_name, buyer_email, message, status)
+VALUES (5, 1, 'John Doe', 'john@example.com', 'Is this property still available?', 'pending');
+
+[SEND - Get Seller Info for Email Notification]
+SELECT name, email FROM users WHERE id = 2;
+
+[GET SENT - Retrieve Buyer's Sent Inquiries]
+SELECT * FROM inquiries WHERE buyer_id = 1;
+
+[GET SENT - Get Property Details for Display]
+SELECT title FROM properties WHERE id IN (5, 8, 12);
+
+[GET RECEIVED - Get Seller's Properties]
+SELECT id FROM properties WHERE owner_id = 2;
+
+[GET RECEIVED - Get Inquiries for Those Properties]
+SELECT *
+FROM inquiries
+WHERE property_id IN (5, 8, 12);  -- Property IDs from previous query
+
+[REPLY - Get Inquiry and Verify Ownership]
+SELECT i.*, p.owner_id
+FROM inquiries i
+JOIN properties p ON i.property_id = p.id
+WHERE i.id = 10;
+
+[REPLY - Update Inquiry with Reply]
+UPDATE inquiries
+SET reply = 'Yes, the property is still available. Would you like to schedule a visit?',
+    status = 'replied'
+WHERE id = 10;
+
+[CLOSE - Close Inquiry]
+UPDATE inquiries SET status = 'closed' WHERE id = 10 AND buyer_id = 1;
+
+
+--------------------------------------------------------------------------------
+FEATURE 6: APPOINTMENT SCHEDULING
+--------------------------------------------------------------------------------
+
+[BOOK - Check Property Exists and Get Owner]
+SELECT id, owner_id FROM properties WHERE id = 5;
+
+[BOOK - Check for Duplicate Booking]
+SELECT *
+FROM appointments
+WHERE property_id = 5
+  AND user_id = 1
+  AND visit_date = '2026-06-15'
+  AND visit_time = '10:00 AM';
+
+[BOOK - Insert Appointment]
+INSERT INTO appointments (property_id, user_id, user_name, user_email, visit_date, visit_time, note, status)
+VALUES (5, 1, 'John Doe', 'john@example.com', '2026-06-15', '10:00 AM', 'Looking forward to the viewing', 'pending');
+
+[GET MINE - Retrieve User's Appointments]
+SELECT * FROM appointments WHERE user_id = 1;
+
+[GET MINE - Get Property Details]
+SELECT title FROM properties WHERE id = 5;
+
+[GET RECEIVED - Get Seller's Properties]
+SELECT id FROM properties WHERE owner_id = 2;
+
+[GET RECEIVED - Get Appointments for Those Properties]
+SELECT *
+FROM appointments
+WHERE property_id IN (5, 8, 12);  -- Property IDs from previous query
+
+[CONFIRM - Verify Authorization and Update]
+SELECT a.*, p.owner_id
+FROM appointments a
+JOIN properties p ON a.property_id = p.id
+WHERE a.id = 15;
+
+[CONFIRM - Update Appointment Status]
+UPDATE appointments SET status = 'confirmed' WHERE id = 15;
+
+[CANCEL - Verify Authorization]
+SELECT a.*, p.owner_id, a.user_id
+FROM appointments a
+JOIN properties p ON a.property_id = p.id
+WHERE a.id = 15;
+
+[CANCEL - Update Appointment Status]
+UPDATE appointments SET status = 'cancelled' WHERE id = 15;
+
+
+--------------------------------------------------------------------------------
+FEATURE 7: USER PROFILE MANAGEMENT
+--------------------------------------------------------------------------------
+
+[GET PROFILE - Retrieve Current User Data]
+SELECT id, name, email, phone, city, bio, avatar, is_admin
+FROM users
+WHERE id = 1;
+
+[UPDATE PROFILE - Modify User Information]
+UPDATE users
+SET name = 'John Smith',
+    phone = '+1-555-0123',
+    city = 'New York',
+    bio = 'Passionate real estate enthusiast looking for investment opportunities'
+WHERE id = 1;
+
+[CHANGE PASSWORD - Get Current Password Hash]
+SELECT password FROM users WHERE id = 1;
+
+[CHANGE PASSWORD - Update Password]
+UPDATE users
+SET password = '$2b$12$new_hashed_password_here'
+WHERE id = 1;
+
+[GET LISTINGS - Retrieve User's Property Listings]
+SELECT * FROM properties WHERE owner_id = 1;
+
+[DELETE LISTING - Remove User's Property]
+DELETE FROM properties WHERE id = 10 AND owner_id = 1;
+
+
+--------------------------------------------------------------------------------
+FEATURE 8: FILE UPLOAD SYSTEM
+--------------------------------------------------------------------------------
+
+[PROPERTY IMAGE - Get Property and Verify Ownership]
+SELECT id, owner_id, image_path FROM properties WHERE id = 5;
+
+[PROPERTY IMAGE - Update Image Path]
+UPDATE properties SET image_path = 'uploads/abc123-uuid.jpg' WHERE id = 5;
+
+[AVATAR - Get Current Avatar]
+SELECT avatar FROM users WHERE id = 1;
+
+[AVATAR - Update Avatar Path]
+UPDATE users SET avatar = '/uploads/avatars/xyz789-uuid.png' WHERE id = 1;
+
+Note: File operations also involve filesystem operations (write, delete) that
+are not SQL queries. The queries above handle database record updates only.
+
+
+--------------------------------------------------------------------------------
+FEATURE 9: ADMIN PANEL
+--------------------------------------------------------------------------------
+
+[GET ALL USERS - List All Registered Users]
+SELECT id, name, email, is_admin FROM users;
+
+[DELETE USER - Remove User Account]
+DELETE FROM users WHERE id = 5 AND id != 1;  -- Cannot delete self
+
+[MAKE ADMIN - Promote User to Administrator]
+UPDATE users SET is_admin = TRUE WHERE id = 5;
+
+[GET ALL PROPERTIES - List All Properties]
+SELECT * FROM properties;
+
+[DELETE PROPERTY - Remove Property (Admin Override)]
+DELETE FROM properties WHERE id = 10;
+
+[GET STATISTICS - Count Total Users]
+SELECT COUNT(*) as total_users FROM users;
+
+[GET STATISTICS - Count Total Properties]
+SELECT COUNT(*) as total_properties FROM properties;
+
+[GET STATISTICS - Count Total Admins]
+SELECT COUNT(*) as total_admins FROM users WHERE is_admin = TRUE;
+
+
+--------------------------------------------------------------------------------
+FEATURE 10: EMAIL NOTIFICATIONS
+--------------------------------------------------------------------------------
+
+Email notifications are application-layer features that don't involve direct
+SQL queries. They are triggered by events in other features and use data
+already retrieved:
+
+[Welcome Email]
+Triggered by: Feature 1 - User Signup
+Data Source: Newly created user record (name, email)
+
+[Inquiry Received Email]
+Triggered by: Feature 5 - Send Inquiry
+Data Source: Seller info from users table + inquiry details
+
+[Inquiry Replied Email]
+Triggered by: Feature 5 - Reply to Inquiry
+Data Source: Buyer info from inquiry record + property title
+
+[Appointment Booked Email]
+Triggered by: Feature 6 - Book Appointment
+Data Source: User info + property title + appointment details
+
+Email delivery is handled by SMTP server configuration (Mailtrap for
+development, Gmail for production) specified in environment variables.
+
+
+================================================================================
+END OF DOCUMENTATION
+================================================================================
+Generated: 2026-06-08
+Platform: DreamHomes Real Estate Application
+Database: PostgreSQL with SQLAlchemy ORM
+Framework: FastAPI (Python)
+================================================================================

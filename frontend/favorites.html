@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>My Favorites</title>
+    <link rel="stylesheet" href="css.css">
+    <style>
+        .card-footer { display:flex; justify-content:space-between; align-items:center; margin-top:10px; }
+        .fav-btn { background:none; border:none; font-size:22px; cursor:pointer; }
+        #no-results { text-align:center; color:gray; font-size:18px; margin-top:40px; display:none; }
+    </style>
+</head>
+<body>
+
+    <div class="navbar">
+        <h1>DreamHomes</h1>
+        <ul>
+            <li><a href="home.html">Home</a></li>
+            <li><a href="seller.html">Seller</a></li>
+            <li><a href="favorites.html">❤ Favorites</a></li>
+            <li><a href="#" onclick="logout()">Logout</a></li>
+        </ul>
+    </div>
+
+    <section class="properties">
+        <h2>My Favorites</h2>
+        <p id="no-results">You have no saved properties yet. <a href="home.html">Browse properties</a></p>
+        <div class="property-grid" id="property-grid" style="margin-top:30px;"></div>
+    </section>
+
+    <footer><p>© 2026 DreamHomes. All Rights Reserved.</p></footer>
+
+    <script>
+        const FALLBACK = "https://images.unsplash.com/photo-1570129477492-45c003edd2be?q=80&w=600&auto=format&fit=crop";
+        const token    = localStorage.getItem("token");
+        if (!token) { alert("Please login first."); window.location.href = "login.html"; }
+
+        function logout() {
+            localStorage.removeItem("token");
+            localStorage.removeItem("username");
+            window.location.href = "home.html";
+        }
+
+        async function removeFavorite(propertyId, card) {
+            await fetch(`/favorites/${propertyId}`, {
+                method: "DELETE",
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            card.remove();
+            if (document.getElementById("property-grid").children.length === 0)
+                document.getElementById("no-results").style.display = "block";
+        }
+
+        async function loadFavorites() {
+            const res  = await fetch("/favorites", { headers: { "Authorization": `Bearer ${token}` } });
+            const data = await res.json();
+            const grid = document.getElementById("property-grid");
+            grid.innerHTML = "";
+
+            if (data.length === 0) { document.getElementById("no-results").style.display = "block"; return; }
+
+            data.forEach(p => {
+                const imgSrc = p.image_path ? `/${p.image_path.replace(/\\/g, "/")}` : FALLBACK;
+                const card   = document.createElement("div");
+                card.className = "card";
+                card.innerHTML = `
+                    <img src="${imgSrc}" onerror="this.src='${FALLBACK}'">
+                    <div class="card-content">
+                        <h3>${p.title}</h3>
+                        <p>${p.location}</p>
+                        <div class="card-footer">
+                            <strong>$${p.price.toLocaleString()}</strong>
+                            <button class="fav-btn" title="Remove from favorites">❤️</button>
+                        </div>
+                        <p style="font-size:14px;color:#555;margin-top:8px;">${p.description}</p>
+                    </div>`;
+                card.querySelector(".fav-btn").onclick = () => removeFavorite(p.id, card);
+                grid.appendChild(card);
+            });
+        }
+
+        loadFavorites();
+    </script>
+</body>
+</html>

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Appointments</title>
+    <link rel="stylesheet" href="css.css">
+    <style>
+        .dashboard  { max-width:900px; margin:40px auto; padding:0 20px; }
+        .tabs       { display:flex; gap:10px; margin-bottom:25px; }
+        .tab        { padding:10px 25px; border:none; border-radius:5px; font-size:16px; cursor:pointer; background:#ddd; }
+        .tab.active { background:#0d1b2a; color:white; }
+        .appt-card  { background:white; padding:20px; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.1); margin-bottom:15px; display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px; }
+        .appt-info h4   { margin-bottom:5px; color:#0d1b2a; }
+        .appt-info .meta { font-size:14px; color:gray; margin-bottom:4px; }
+        .appt-info .note { font-size:14px; color:#555; font-style:italic; margin-top:6px; }
+        .appt-actions { display:flex; gap:8px; flex-wrap:wrap; }
+        .status { display:inline-block; padding:3px 10px; border-radius:10px; font-size:12px; font-weight:bold; margin-top:5px; }
+        .status.pending   { background:#fff3cd; color:#856404; }
+        .status.confirmed { background:#d1e7dd; color:#0a3622; }
+        .status.cancelled { background:#f8d7da; color:#842029; }
+        .btn-confirm { background:#00b4d8; color:white; border:none; padding:7px 14px; border-radius:5px; cursor:pointer; font-size:13px; }
+        .btn-cancel  { background:#e63946; color:white; border:none; padding:7px 14px; border-radius:5px; cursor:pointer; font-size:13px; }
+        #empty-msg   { color:gray; text-align:center; margin-top:30px; display:none; }
+    </style>
+</head>
+<body>
+
+    <div class="navbar">
+        <h1>DreamHomes</h1>
+        <ul>
+            <li><a href="home.html">Home</a></li>
+            <li><a href="seller.html">Seller</a></li>
+            <li><a href="favorites.html">❤ Favorites</a></li>
+            <li><a href="appointments.html" style="color:#00b4d8;">📅 Appointments</a></li>
+            <li><a href="inquiries.html">📩 Inquiries</a></li>
+            <li><a href="profile.html">👤 Profile</a></li>
+            <li><a href="#" onclick="logout()">Logout</a></li>
+        </ul>
+    </div>
+
+    <div class="dashboard">
+        <h2 style="margin-bottom:20px;">📅 Appointments</h2>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('mine',     this)">My Bookings</button>
+            <button class="tab"        onclick="switchTab('received', this)">Received Visits</button>
+        </div>
+
+        <p id="empty-msg">No appointments found.</p>
+        <div id="appt-list"></div>
+    </div>
+
+    <footer><p>© 2026 DreamHomes. All Rights Reserved.</p></footer>
+
+    <script>
+        const token = localStorage.getItem("token");
+        if (!token) { alert("Please login first."); window.location.href = "login.html"; }
+
+        function logout() { localStorage.removeItem("token"); localStorage.removeItem("username"); window.location.href = "home.html"; }
+
+        let currentTab = "mine";
+
+        function switchTab(tab, btn) {
+            currentTab = tab;
+            document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+            btn.classList.add("active");
+            loadAppointments();
+        }
+
+        async function loadAppointments() {
+            const url  = currentTab === "mine" ? "/appointments/mine" : "/appointments/received";
+            const res  = await fetch(url, { headers: { "Authorization": `Bearer ${token}` } });
+            const data = await res.json();
+            const list  = document.getElementById("appt-list");
+            const empty = document.getElementById("empty-msg");
+            list.innerHTML = "";
+
+            if (data.length === 0) { empty.style.display = "block"; return; }
+            empty.style.display = "none";
+
+            data.forEach(a => {
+                const confirmBtn = currentTab === "received" && a.status === "pending"
+                    ? `<button class="btn-confirm" onclick="confirmAppt(${a.id})">✓ Confirm</button>` : "";
+                const cancelBtn  = a.status !== "cancelled"
+                    ? `<button class="btn-cancel" onclick="cancelAppt(${a.id})">✕ Cancel</button>` : "";
+                const visitorInfo = currentTab === "received"
+                    ? `<div class="meta">👤 ${a.user_name} &nbsp;|&nbsp; ✉ ${a.user_email}</div>` : "";
+
+                list.innerHTML += `
+                    <div class="appt-card" id="appt-${a.id}">
+                        <div class="appt-info">
+                            <h4><a href="property.html?id=${a.property_id}" style="color:#0d1b2a;text-decoration:none;">${a.property_title}</a></h4>
+                            ${visitorInfo}
+                            <div class="meta">📅 ${a.visit_date} &nbsp;|&nbsp; 🕐 ${a.visit_time}</div>
+                            ${a.note ? `<div class="note">📝 "${a.note}"</div>` : ""}
+                            <span class="status ${a.status}">${a.status}</span>
+                        </div>
+                        <div class="appt-actions">
+                            ${confirmBtn}
+                            ${cancelBtn}
+                        </div>
+                    </div>`;
+            });
+        }
+
+        async function confirmAppt(id) {
+            const res = await fetch(`/appointments/${id}/confirm`, {
+                method: "PUT",
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            if (res.ok) loadAppointments();
+        }
+
+        async function cancelAppt(id) {
+            if (!confirm("Cancel this appointment?")) return;
+            const res = await fetch(`/appointments/${id}/cancel`, {
+                method: "PUT",
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            if (res.ok) loadAppointments();
+        }
+
+        loadAppointments();
+    </script>
+</body>
+</html>

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Seller Page</title>
+    <link rel="stylesheet" href="css.css">
+    <style>
+        #preview { width: 100%; height: 200px; object-fit: cover; border-radius: 5px; display: none; margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+
+    <div class="navbar">
+        <h1>DreamHomes</h1>
+        <ul>
+            <li><a href="home.html">Home</a></li>
+            <li><a href="seller.html">Seller</a></li>
+            <li><a href="login.html">Login</a></li>
+            <li><a href="signup.html">Signup</a></li>
+        </ul>
+    </div>
+
+    <div class="form-container">
+        <h2>Post Property</h2>
+
+        <div class="form-group">
+            <label>Property Title</label>
+            <input id="title" type="text" placeholder="Property Title">
+        </div>
+        <div class="form-group">
+            <label>Location</label>
+            <input id="location" type="text" placeholder="e.g. Karachi, Pakistan">
+        </div>
+        <div class="form-group">
+            <label>Price ($)</label>
+            <input id="price" type="number" placeholder="e.g. 150000">
+        </div>
+        <div class="form-group">
+            <label>Description</label>
+            <textarea id="description" rows="4" placeholder="Property Description"></textarea>
+        </div>
+        <div class="form-group">
+            <label>Property Image</label>
+            <img id="preview">
+            <input id="image" type="file" accept="image/jpeg,image/png,image/webp" onchange="previewImage(this)">
+        </div>
+        <p id="msg" style="color:red;text-align:center;margin-bottom:10px;"></p>
+        <button class="submit-btn" onclick="submitProperty()">Submit Property</button>
+    </div>
+
+    <script>
+        if (!localStorage.getItem("token")) {
+            alert("Please login to post a property.");
+            window.location.href = "login.html";
+        }
+
+        function previewImage(input) {
+            const preview = document.getElementById("preview");
+            if (input.files && input.files[0]) {
+                preview.src = URL.createObjectURL(input.files[0]);
+                preview.style.display = "block";
+            }
+        }
+
+        async function submitProperty() {
+            const token = localStorage.getItem("token");
+            const msg   = document.getElementById("msg");
+
+            // Step 1 — Post property details
+            const res = await fetch("/properties", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({
+                    title:       document.getElementById("title").value,
+                    location:    document.getElementById("location").value,
+                    price:       parseInt(document.getElementById("price").value),
+                    description: document.getElementById("description").value
+                })
+            });
+
+            if (!res.ok) {
+                const data = await res.json();
+                msg.textContent = data.detail || "Error posting property.";
+                return;
+            }
+
+            const prop = await res.json();
+
+            // Step 2 — Upload image if selected
+            const imageFile = document.getElementById("image").files[0];
+            if (imageFile) {
+                const formData = new FormData();
+                formData.append("file", imageFile);
+                const imgRes = await fetch(`/properties/${prop.id}/image`, {
+                    method: "POST",
+                    headers: { "Authorization": `Bearer ${token}` },
+                    body: formData
+                });
+                if (!imgRes.ok) {
+                    msg.style.color = "orange";
+                    msg.textContent = "Property posted but image upload failed.";
+                    return;
+                }
+            }
+
+            alert("Property posted successfully!");
+            window.location.href = "home.html";
+        }
+    </script>
+</body>
+</html>

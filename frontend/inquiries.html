@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Inquiries</title>
+    <link rel="stylesheet" href="css.css">
+    <style>
+        .dashboard { padding:40px 50px; max-width:900px; margin:0 auto; }
+        .tabs { display:flex; gap:10px; margin-bottom:25px; }
+        .tab { padding:10px 25px; border:none; border-radius:5px; font-size:16px; cursor:pointer; background:#ddd; }
+        .tab.active { background:#0d1b2a; color:white; }
+        .inq-card { background:white; padding:20px; border-radius:10px; box-shadow:0 2px 8px rgba(0,0,0,0.1); margin-bottom:15px; }
+        .inq-card h4 { margin-bottom:6px; color:#0d1b2a; }
+        .inq-card .meta { font-size:13px; color:gray; margin-bottom:10px; }
+        .inq-card .message { color:#333; margin-bottom:10px; }
+        .status { display:inline-block; padding:3px 10px; border-radius:10px; font-size:12px; font-weight:bold; }
+        .status.pending  { background:#fff3cd; color:#856404; }
+        .status.replied  { background:#d1e7dd; color:#0a3622; }
+        .status.closed   { background:#f8d7da; color:#842029; }
+        .reply-box { background:#f0f8ff; padding:12px; border-radius:6px; margin-top:10px; font-size:14px; }
+        .reply-form { margin-top:10px; display:flex; gap:10px; }
+        .reply-form textarea { flex:1; padding:8px; border:1px solid #ccc; border-radius:5px; resize:none; }
+        .reply-form button { padding:8px 16px; background:#00b4d8; color:white; border:none; border-radius:5px; cursor:pointer; }
+        .btn-close { margin-top:8px; padding:6px 14px; background:#888; color:white; border:none; border-radius:5px; cursor:pointer; font-size:13px; }
+        #empty-msg { color:gray; text-align:center; margin-top:30px; display:none; }
+    </style>
+</head>
+<body>
+
+    <div class="navbar">
+        <h1>DreamHomes</h1>
+        <ul>
+            <li><a href="home.html">Home</a></li>
+            <li><a href="seller.html">Seller</a></li>
+            <li><a href="favorites.html">❤ Favorites</a></li>
+            <li><a href="inquiries.html">📩 Inquiries</a></li>
+            <li><a href="#" onclick="logout()">Logout</a></li>
+        </ul>
+    </div>
+
+    <div class="dashboard">
+        <h2 style="margin-bottom:20px;">📩 Inquiries</h2>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('sent', this)">Sent by Me</button>
+            <button class="tab"        onclick="switchTab('received', this)">Received</button>
+        </div>
+
+        <p id="empty-msg">No inquiries found.</p>
+        <div id="inq-list"></div>
+    </div>
+
+    <footer><p>© 2026 DreamHomes. All Rights Reserved.</p></footer>
+
+    <script>
+        const token = localStorage.getItem("token");
+        if (!token) { alert("Please login first."); window.location.href = "login.html"; }
+
+        function logout() { localStorage.removeItem("token"); localStorage.removeItem("username"); window.location.href = "home.html"; }
+
+        let currentTab = "sent";
+
+        function switchTab(tab, btn) {
+            currentTab = tab;
+            document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+            btn.classList.add("active");
+            loadInquiries();
+        }
+
+        async function loadInquiries() {
+            const url  = currentTab === "sent" ? "/inquiries/mine" : "/inquiries/received";
+            const res  = await fetch(url, { headers: { "Authorization": `Bearer ${token}` } });
+            const data = await res.json();
+            const list = document.getElementById("inq-list");
+            const empty = document.getElementById("empty-msg");
+            list.innerHTML = "";
+
+            if (data.length === 0) { empty.style.display = "block"; return; }
+            empty.style.display = "none";
+
+            data.forEach(inq => {
+                const statusClass = inq.status;
+                const replyHtml   = inq.reply
+                    ? `<div class="reply-box"><strong>Seller replied:</strong> ${inq.reply}</div>`
+                    : "";
+                const replyForm   = currentTab === "received" && inq.status !== "closed"
+                    ? `<div class="reply-form">
+                           <textarea id="reply-${inq.id}" rows="2" placeholder="Write a reply..."></textarea>
+                           <button onclick="sendReply(${inq.id})">Reply</button>
+                       </div>`
+                    : "";
+                const closeBtn    = currentTab === "sent" && inq.status !== "closed"
+                    ? `<button class="btn-close" onclick="closeInquiry(${inq.id})">Mark as Closed</button>`
+                    : "";
+
+                list.innerHTML += `
+                    <div class="inq-card" id="inq-${inq.id}">
+                        <h4>${inq.property_title}</h4>
+                        <div class="meta">
+                            ${currentTab === "received" ? `From: <strong>${inq.buyer_name}</strong> (${inq.buyer_email}) &nbsp;|&nbsp;` : ""}
+                            Status: <span class="status ${statusClass}">${inq.status}</span>
+                        </div>
+                        <div class="message">${inq.message}</div>
+                        ${replyHtml}
+                        ${replyForm}
+                        ${closeBtn}
+                    </div>`;
+            });
+        }
+
+        async function sendReply(inquiryId) {
+            const reply = document.getElementById(`reply-${inquiryId}`).value.trim();
+            if (!reply) return;
+            const res = await fetch(`/inquiries/${inquiryId}/reply`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ reply })
+            });
+            if (res.ok) loadInquiries();
+        }
+
+        async function closeInquiry(inquiryId) {
+            if (!confirm("Mark this inquiry as closed?")) return;
+            await fetch(`/inquiries/${inquiryId}/close`, {
+                method: "PUT",
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            loadInquiries();
+        }
+
+        loadInquiries();
+    </script>
+</body>
+</html>

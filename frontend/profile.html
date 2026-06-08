@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>My Profile</title>
+    <link rel="stylesheet" href="css.css">
+    <style>
+        .profile-container { max-width:850px; margin:40px auto; padding:0 20px; }
+        .profile-header {
+            background:white; padding:30px; border-radius:10px;
+            box-shadow:0 2px 10px rgba(0,0,0,0.1); display:flex;
+            align-items:center; gap:30px; margin-bottom:25px;
+        }
+        .avatar-wrap { position:relative; }
+        .avatar-wrap img { width:110px; height:110px; border-radius:50%; object-fit:cover; border:3px solid #00b4d8; }
+        .avatar-wrap label {
+            position:absolute; bottom:0; right:0; background:#00b4d8;
+            color:white; border-radius:50%; width:28px; height:28px;
+            display:flex; align-items:center; justify-content:center;
+            cursor:pointer; font-size:16px;
+        }
+        .avatar-wrap input { display:none; }
+        .profile-info h2 { font-size:26px; margin-bottom:5px; }
+        .profile-info p  { color:gray; margin-bottom:3px; }
+        .badge-admin { background:#00b4d8; color:white; padding:2px 10px; border-radius:10px; font-size:12px; margin-left:8px; }
+
+        .tabs { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; }
+        .tab  { padding:10px 20px; border:none; border-radius:5px; font-size:15px; cursor:pointer; background:#ddd; }
+        .tab.active { background:#0d1b2a; color:white; }
+
+        .section-box { background:white; padding:25px; border-radius:10px; box-shadow:0 2px 10px rgba(0,0,0,0.1); margin-bottom:20px; }
+        .section-box h3 { margin-bottom:15px; }
+        .form-row { display:grid; grid-template-columns:1fr 1fr; gap:15px; }
+        .success { color:green; margin-top:10px; }
+        .error   { color:red;   margin-top:10px; }
+
+        .listing-card { display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid #eee; }
+        .listing-card:last-child { border-bottom:none; }
+        .listing-info h4 { margin-bottom:3px; }
+        .listing-info p  { color:gray; font-size:14px; }
+        .btn-delete { background:#e63946; color:white; border:none; padding:6px 14px; border-radius:5px; cursor:pointer; }
+        .btn-delete:hover { background:#c1121f; }
+    </style>
+</head>
+<body>
+
+    <div class="navbar">
+        <h1>DreamHomes</h1>
+        <ul>
+            <li><a href="home.html">Home</a></li>
+            <li><a href="seller.html">Seller</a></li>
+            <li><a href="favorites.html">❤ Favorites</a></li>
+            <li><a href="inquiries.html">📩 Inquiries</a></li>
+            <li><a href="profile.html" style="color:#00b4d8;">👤 Profile</a></li>
+            <li><a href="#" onclick="logout()">Logout</a></li>
+        </ul>
+    </div>
+
+    <div class="profile-container">
+
+        <!-- Profile Header -->
+        <div class="profile-header">
+            <div class="avatar-wrap">
+                <img id="avatar-img" src="https://ui-avatars.com/api/?name=User&background=00b4d8&color=fff&size=110">
+                <label for="avatar-input" title="Change photo">✏</label>
+                <input id="avatar-input" type="file" accept="image/jpeg,image/png,image/webp" onchange="uploadAvatar(this)">
+            </div>
+            <div class="profile-info">
+                <h2 id="ph-name">—</h2>
+                <p id="ph-email">—</p>
+                <p id="ph-city">—</p>
+                <p id="ph-phone">—</p>
+                <p id="ph-bio" style="font-style:italic;"></p>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('edit',    this)">Edit Profile</button>
+            <button class="tab"        onclick="showTab('password',this)">Change Password</button>
+            <button class="tab"        onclick="showTab('listings',this)">My Listings</button>
+        </div>
+
+        <!-- Edit Profile -->
+        <div id="tab-edit" class="section-box">
+            <h3>Edit Profile</h3>
+            <div class="form-row">
+                <div class="form-group"><label>Full Name</label><input id="e-name"  type="text"></div>
+                <div class="form-group"><label>Phone</label>    <input id="e-phone" type="text" placeholder="e.g. +92 300 1234567"></div>
+                <div class="form-group"><label>City</label>     <input id="e-city"  type="text" placeholder="e.g. Lahore, Pakistan"></div>
+            </div>
+            <div class="form-group" style="margin-top:10px;">
+                <label>Bio</label>
+                <textarea id="e-bio" rows="3" style="width:100%;padding:10px;border:1px solid #ccc;border-radius:5px;" placeholder="Tell buyers/sellers a bit about yourself..."></textarea>
+            </div>
+            <p id="edit-msg" class="success"></p>
+            <button class="submit-btn" style="margin-top:10px;" onclick="saveProfile()">Save Changes</button>
+        </div>
+
+        <!-- Change Password -->
+        <div id="tab-password" class="section-box" style="display:none;">
+            <h3>Change Password</h3>
+            <div class="form-group"><label>Current Password</label><input id="p-current" type="password" placeholder="Enter current password"></div>
+            <div class="form-group"><label>New Password</label>    <input id="p-new"     type="password" placeholder="Enter new password"></div>
+            <div class="form-group"><label>Confirm Password</label><input id="p-confirm" type="password" placeholder="Confirm new password"></div>
+            <p id="pw-msg"></p>
+            <button class="submit-btn" style="margin-top:10px;" onclick="changePassword()">Change Password</button>
+        </div>
+
+        <!-- My Listings -->
+        <div id="tab-listings" class="section-box" style="display:none;">
+            <h3>My Listings</h3>
+            <p id="no-listings" style="color:gray;display:none;">You have not posted any properties yet. <a href="seller.html">Post one now</a></p>
+            <div id="listings-list"></div>
+        </div>
+
+    </div>
+
+    <footer><p>© 2026 DreamHomes. All Rights Reserved.</p></footer>
+
+    <script>
+        const token = localStorage.getItem("token");
+        if (!token) { alert("Please login first."); window.location.href = "login.html"; }
+
+        function logout() { localStorage.removeItem("token"); localStorage.removeItem("username"); window.location.href = "home.html"; }
+
+        function showTab(name, btn) {
+            ["edit","password","listings"].forEach(t => document.getElementById(`tab-${t}`).style.display = "none");
+            document.getElementById(`tab-${name}`).style.display = "block";
+            document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+            btn.classList.add("active");
+            if (name === "listings") loadListings();
+        }
+
+        async function loadProfile() {
+            const res  = await fetch("/users/me", { headers: { "Authorization": `Bearer ${token}` } });
+            const u    = await res.json();
+            const avatarUrl = u.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}&background=00b4d8&color=fff&size=110`;
+            document.getElementById("avatar-img").src  = avatarUrl;
+            document.getElementById("ph-name").innerHTML  = u.name + (u.is_admin ? '<span class="badge-admin">Admin</span>' : '');
+            document.getElementById("ph-email").textContent = "✉ " + u.email;
+            document.getElementById("ph-city").textContent  = u.city  ? "📍 " + u.city  : "";
+            document.getElementById("ph-phone").textContent = u.phone ? "📞 " + u.phone : "";
+            document.getElementById("ph-bio").textContent   = u.bio   || "";
+            document.getElementById("e-name").value  = u.name  || "";
+            document.getElementById("e-phone").value = u.phone || "";
+            document.getElementById("e-city").value  = u.city  || "";
+            document.getElementById("e-bio").value   = u.bio   || "";
+        }
+
+        async function saveProfile() {
+            const msg = document.getElementById("edit-msg");
+            const res = await fetch("/users/me", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({
+                    name:  document.getElementById("e-name").value,
+                    phone: document.getElementById("e-phone").value,
+                    city:  document.getElementById("e-city").value,
+                    bio:   document.getElementById("e-bio").value
+                })
+            });
+            if (res.ok) {
+                // Update stored username
+                localStorage.setItem("username", document.getElementById("e-name").value);
+                msg.className = "success"; msg.textContent = "Profile updated successfully!";
+                loadProfile();
+            } else {
+                msg.className = "error"; msg.textContent = "Failed to update profile.";
+            }
+        }
+
+        async function uploadAvatar(input) {
+            if (!input.files[0]) return;
+            const formData = new FormData();
+            formData.append("file", input.files[0]);
+            const res  = await fetch("/users/me/avatar", {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${token}` },
+                body: formData
+            });
+            const data = await res.json();
+            if (res.ok) document.getElementById("avatar-img").src = data.avatar_url;
+            else alert(data.detail || "Avatar upload failed.");
+        }
+
+        async function changePassword() {
+            const current = document.getElementById("p-current").value;
+            const newPw   = document.getElementById("p-new").value;
+            const confirm = document.getElementById("p-confirm").value;
+            const msg     = document.getElementById("pw-msg");
+            if (newPw !== confirm) { msg.className = "error"; msg.textContent = "New passwords do not match."; return; }
+            if (newPw.length < 6)  { msg.className = "error"; msg.textContent = "Password must be at least 6 characters."; return; }
+            const res  = await fetch("/users/me/password", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ current_password: current, new_password: newPw })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                msg.className = "success"; msg.textContent = "Password changed successfully!";
+                document.getElementById("p-current").value = "";
+                document.getElementById("p-new").value     = "";
+                document.getElementById("p-confirm").value = "";
+            } else { msg.className = "error"; msg.textContent = data.detail; }
+        }
+
+        async function loadListings() {
+            const res  = await fetch("/users/me/listings", { headers: { "Authorization": `Bearer ${token}` } });
+            const data = await res.json();
+            const list = document.getElementById("listings-list");
+            list.innerHTML = "";
+            if (data.length === 0) { document.getElementById("no-listings").style.display = "block"; return; }
+            document.getElementById("no-listings").style.display = "none";
+            data.forEach(p => {
+                list.innerHTML += `
+                    <div class="listing-card" id="listing-${p.id}">
+                        <div class="listing-info">
+                            <h4><a href="property.html?id=${p.id}" style="color:#0d1b2a;text-decoration:none;">${p.title}</a></h4>
+                            <p>${p.location} &nbsp;|&nbsp; $${p.price.toLocaleString()}</p>
+                        </div>
+                        <button class="btn-delete" onclick="deleteListing(${p.id})">Delete</button>
+                    </div>`;
+            });
+        }
+
+        async function deleteListing(id) {
+            if (!confirm("Delete this listing?")) return;
+            const res = await fetch(`/users/me/listings/${id}`, {
+                method: "DELETE",
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            if (res.ok) document.getElementById(`listing-${id}`).remove();
+        }
+
+        loadProfile();
+    </script>
+</body>
+</html>

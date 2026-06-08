@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real Estate Home</title>
+    <link rel="stylesheet" href="css.css">
+    <style>
+        .search-bar { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; padding:30px 50px 0; }
+        .search-bar input { padding:10px 15px; border:1px solid #ccc; border-radius:5px; font-size:16px; width:220px; }
+        .search-bar button { padding:10px 20px; background:#00b4d8; color:white; border:none; border-radius:5px; font-size:16px; cursor:pointer; }
+        .search-bar button:hover { background:#0077b6; }
+        .search-bar button.clear { background:#888; }
+        .search-bar button.clear:hover { background:#555; }
+        #no-results { text-align:center; color:gray; font-size:18px; margin-top:20px; display:none; }
+        .card-footer { display:flex; justify-content:space-between; align-items:center; margin-top:10px; }
+        .fav-btn { background:none; border:none; font-size:22px; cursor:pointer; }
+        .stars { color:#f4a261; font-size:14px; margin-top:5px; }
+        .card a.detail-link { display:block; color:#0077b6; font-size:14px; margin-top:8px; text-decoration:none; }
+        .card a.detail-link:hover { text-decoration:underline; }
+    </style>
+</head>
+<body>
+
+    <div class="navbar">
+        <h1>DreamHomes</h1>
+        <ul>
+            <li><a href="home.html">Home</a></li>
+            <li><a href="seller.html">Seller</a></li>
+            <li id="fav-link" style="display:none;"><a href="favorites.html">❤ Favorites</a></li>
+            <li id="auth-link"><a href="login.html">Login</a></li>
+            <li id="signup-link"><a href="signup.html">Signup</a></li>
+            <li id="profile-link" style="display:none;"><a href="profile.html">👤 Profile</a></li>
+            <li id="logout-link" style="display:none;"><a href="#" onclick="logout()">Logout</a></li>
+            <li id="user-greeting" style="display:none;color:#00b4d8;"></li>
+        </ul>
+    </div>
+
+    <section class="hero">
+        <div class="hero-content">
+            <h2>Find Your Dream Home</h2>
+            <p>Best properties at affordable prices</p>
+            <a href="seller.html" class="btn">Post a Property</a>
+        </div>
+    </section>
+
+    <section class="properties">
+        <h2>Featured Properties</h2>
+        <div class="search-bar">
+            <input id="search"    type="text"   placeholder="Search by title or city...">
+            <input id="min-price" type="number" placeholder="Min Price ($)">
+            <input id="max-price" type="number" placeholder="Max Price ($)">
+            <button onclick="loadProperties()">Search</button>
+            <button class="clear" onclick="clearSearch()">Clear</button>
+        </div>
+        <p id="no-results">No properties found.</p>
+        <div class="property-grid" id="property-grid" style="margin-top:30px;"></div>
+    </section>
+
+    <footer><p>© 2026 DreamHomes. All Rights Reserved.</p></footer>
+
+    <script>
+        const FALLBACK = "https://images.unsplash.com/photo-1570129477492-45c003edd2be?q=80&w=600&auto=format&fit=crop";
+        const token    = localStorage.getItem("token");
+        const username = localStorage.getItem("username");
+        let myFavorites = [];
+
+        if (token && username) {
+            document.getElementById("auth-link").style.display    = "none";
+            document.getElementById("signup-link").style.display  = "none";
+            document.getElementById("logout-link").style.display  = "list-item";
+            document.getElementById("fav-link").style.display     = "list-item";
+            document.getElementById("user-greeting").style.display = "list-item";
+            document.getElementById("profile-link").style.display = "list-item";
+            document.getElementById("user-greeting").textContent  = `Hi, ${username}`;
+            loadMyFavorites();
+        }
+
+        function logout() {
+            localStorage.removeItem("token");
+            localStorage.removeItem("username");
+            window.location.reload();
+        }
+
+        async function loadMyFavorites() {
+            const res  = await fetch("/favorites", { headers: { "Authorization": `Bearer ${token}` } });
+            const data = await res.json();
+            myFavorites = data.map(p => p.id);
+        }
+
+        async function toggleFavorite(propertyId, btn) {
+            if (!token) { alert("Please login to save favorites."); return; }
+            const isFav  = myFavorites.includes(propertyId);
+            await fetch(`/favorites/${propertyId}`, {
+                method: isFav ? "DELETE" : "POST",
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            if (isFav) { myFavorites = myFavorites.filter(id => id !== propertyId); btn.textContent = "🤍"; }
+            else       { myFavorites.push(propertyId); btn.textContent = "❤️"; }
+        }
+
+        function renderStars(avg) {
+            if (!avg) return "No ratings yet";
+            const full  = Math.floor(avg);
+            const half  = avg - full >= 0.5 ? 1 : 0;
+            const empty = 5 - full - half;
+            return "★".repeat(full) + (half ? "½" : "") + "☆".repeat(empty) + ` (${avg})`;
+        }
+
+        async function loadProperties() {
+            const search   = document.getElementById("search").value;
+            const minPrice = document.getElementById("min-price").value;
+            const maxPrice = document.getElementById("max-price").value;
+
+            let url = "/properties?";
+            if (search)   url += `search=${encodeURIComponent(search)}&`;
+            if (minPrice) url += `min_price=${minPrice}&`;
+            if (maxPrice) url += `max_price=${maxPrice}&`;
+
+            const res  = await fetch(url);
+            const data = await res.json();
+            const grid = document.getElementById("property-grid");
+            grid.innerHTML = "";
+
+            if (data.length === 0) { document.getElementById("no-results").style.display = "block"; return; }
+            document.getElementById("no-results").style.display = "none";
+
+            // Load ratings for all properties in parallel
+            const ratings = await Promise.all(data.map(p => fetch(`/reviews/${p.id}`).then(r => r.json())));
+
+            data.forEach((p, i) => {
+                const imgSrc = p.image_path ? `/${p.image_path.replace(/\\/g, "/")}` : FALLBACK;
+                const isFav  = myFavorites.includes(p.id);
+                const heart  = token ? `<button class="fav-btn" onclick="toggleFavorite(${p.id}, this)">${isFav ? "❤️" : "🤍"}</button>` : "";
+                grid.innerHTML += `
+                    <div class="card">
+                        <img src="${imgSrc}" onerror="this.src='${FALLBACK}'">
+                        <div class="card-content">
+                            <h3>${p.title}</h3>
+                            <p>${p.location}</p>
+                            <div class="stars">${renderStars(ratings[i].average_rating)}</div>
+                            <div class="card-footer">
+                                <strong>$${p.price.toLocaleString()}</strong>
+                                ${heart}
+                            </div>
+                            <a class="detail-link" href="property.html?id=${p.id}">View Details & Reviews →</a>
+                        </div>
+                    </div>`;
+            });
+        }
+
+        function clearSearch() {
+            document.getElementById("search").value    = "";
+            document.getElementById("min-price").value = "";
+            document.getElementById("max-price").value = "";
+            loadProperties();
+        }
+
+        loadProperties();
+    </script>
+</body>
+</html>
